@@ -16,16 +16,20 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
+	"github.com/op/go-logging"
 	"gopkg.in/urfave/cli.v1"
-	"path"
+)
+
+var (
+	logger = logging.MustGetLogger("account")
 )
 
 var commandGenerate = cli.Command{
@@ -58,18 +62,18 @@ var commandGenerate = cli.Command{
 
 		accountList, err := os.OpenFile(path.Join(prefix, "addresses"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
 		if err != nil {
-			fmt.Println("open addresses file failed")
+			logger.Error("open addresses file failed")
 			return err
 		}
 		number = ctx.Int("number")
 		if number > 1 {
-			fmt.Printf("Generate %d ethereum account required\n", number)
+			logger.Infof("Generate %d ethereum account required\n", number)
 		}
 
 		for i := 0; i < number; i++ {
 			privateKey, err = crypto.GenerateKey()
 			if err != nil {
-				fmt.Println("Failed to generate random private key", err)
+				logger.Error("Failed to generate random private key", err)
 			}
 			// Create the keyfile object with a random UUID.
 			id := uuid.NewRandom()
@@ -83,21 +87,24 @@ var commandGenerate = cli.Command{
 			passphrase := getPassphrase(ctx, true)
 			keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
 			if err != nil {
-				fmt.Println("Error encrypting key", err)
+				logger.Error("Error encrypting key", err)
+				continue
 			}
 
 			keyfilepath := keystore.KeyFileName(key.Address)
 			keyfilepath = path.Join(prefix, keyfilepath)
 			// Store the file to disk.
 			if err := os.MkdirAll(filepath.Dir(keyfilepath), 0700); err != nil {
-				fmt.Printf("Could not create directory %s\n", filepath.Dir(keyfilepath))
+				logger.Errorf("Could not create directory %s\n", filepath.Dir(keyfilepath))
+				continue
 			}
 			if err := ioutil.WriteFile(keyfilepath, keyjson, 0600); err != nil {
-				fmt.Printf("Failed to write keyfile to %s: %v\n", keyfilepath, err)
+				logger.Errorf("Failed to write keyfile to %s: %v\n", keyfilepath, err)
+				continue
 			}
 
 			// Output some information.
-			fmt.Println("Address:", key.Address.Hex())
+			logger.Notice("Address:", key.Address.Hex())
 			accountList.WriteString(key.Address.Hex() + "\n")
 		}
 		return nil

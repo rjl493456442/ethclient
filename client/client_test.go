@@ -14,18 +14,8 @@
 
 package client
 
-import "github.com/ethereum/go-ethereum/ethclient"
+import "testing"
 
-type Client struct {
-	c *ethclient.Client
-}
-
-func NewClient(url string) (*Client, error) {
-	cli, err := ethclient.Dial(url)
-	if err != nil {
-		return nil, err
-	}
-	return &Client{
-		c: cli,
-	}, nil
+func TestNewClient(t *testing.T) {
+	cli := NewClient("")
 }
