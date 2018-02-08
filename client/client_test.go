@@ -1,5 +1,5 @@
 // Copyright 2016-2017 Hyperchain Corp.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -14,8 +14,20 @@
 
 package client
 
-import "testing"
+import (
+	"context"
+	"fmt"
+	"testing"
+)
 
 func TestNewClient(t *testing.T) {
-	cli := NewClient("")
+	cli, err := NewClient("http://172.16.5.3:9999")
+	if err != nil {
+		t.Error(err)
+	}
+	networkId, err := cli.Cli.NetworkID(context.TODO())
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(networkId)
 }

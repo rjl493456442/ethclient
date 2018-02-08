@@ -15,13 +15,19 @@
 package main
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"errors"
+	"context"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/manifoldco/promptui"
+	"github.com/rjl493456442/ethclient/client"
 	"gopkg.in/urfave/cli.v1"
+	"time"
 )
 
 var (
@@ -38,7 +44,55 @@ var (
 		Usage: "keystore directory path",
 		Value: "keystore",
 	}
+	clientFlag = cli.StringFlag{
+		Name:  "url",
+		Usage: "remote ethereum server url, http/https/ws/ipc are all supported",
+	}
+	chainFlag = cli.IntFlag{
+		Name:  "chainId",
+		Usage: "ethereum network id, 1 for Mainnet network, 3 for Ropsten test network, 4 for Rinkeby test network",
+		Value: 1,
+	}
+	senderFlag = cli.StringFlag{
+		Name:  "sender",
+		Usage: "transaction sender address",
+	}
+	receiverFlag = cli.StringFlag{
+		Name:  "receiver",
+		Usage: "transaction receiver address",
+	}
+	valueFlag = cli.IntFlag{
+		Name:  "value",
+		Usage: "transfer value(wei)",
+	}
+	dataFlag = cli.StringFlag{
+		Name:  "data",
+		Usage: "contract invocation payload",
+	}
 )
+
+// CheckArguments make sure the arguments assigned are valid.
+func CheckArguments(sender, receiver string, value int, payload string) bool {
+	if strings.HasPrefix(sender, "0x") {
+		sender = sender[2:]
+	}
+	if strings.HasPrefix(receiver, "0x") {
+		receiver = receiver[2:]
+	}
+	if sender == "" || len(sender) != 40 {
+		return false
+	}
+	if receiver != "" && len(receiver) != 40 {
+		return false
+	}
+	if receiver == "" && len(common.FromHex(payload)) == 0 {
+		return false
+	}
+	if value < 0 {
+		return false
+	}
+	return true
+}
 
 // createCommandLineApp returns an application instance with sufficient fields.
 func createCommandLineApp() *cli.App {
@@ -97,4 +151,27 @@ func getPassphrase(ctx *cli.Context, confirmation bool) string {
 		}
 	}
 	return passphrase
+}
+
+// getClient returns a remote client connected to specified ethereum server.
+func getClient(ctx *cli.Context) (*client.Client, error) {
+	url := ctx.String(clientFlag.Name)
+	return client.NewClient(url)
+}
+
+// getKeystore returns a keystore with given file path.
+func getKeystore(ctx *cli.Context) *keystore.KeyStore {
+	path := ctx.String(keystoreFlag.Name)
+	keystore := keystore.NewKeyStore(path, keystore.StandardScryptN, keystore.StandardScryptP)
+	return keystore
+}
+
+// makeContext returns background context.
+func makeContext() context.Context {
+	return context.Background()
+}
+
+// makeTimeoutContext returns timeout context with given expire duration.
+func makeTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(makeContext(), timeout)
 }

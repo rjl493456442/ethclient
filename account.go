@@ -23,8 +23,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pborman/uuid"
 	"github.com/op/go-logging"
+	"github.com/pborman/uuid"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -46,67 +46,69 @@ var commandGenerate = cli.Command{
 			Value: 1,
 		},
 	},
-	Action: func(ctx *cli.Context) error {
-		var (
-			privateKey *ecdsa.PrivateKey
-			prefix     string
-			err        error
-			number     int
-		)
+	Action: generateAccount,
+}
 
-		prefix = ctx.String(keystoreFlag.Name)
-		// Create keystore directory if not exist
-		if _, err := os.Stat(prefix); os.IsNotExist(err) {
-			os.MkdirAll(prefix, 0700)
-		}
+func generateAccount(ctx *cli.Context) error {
+	var (
+		privateKey *ecdsa.PrivateKey
+		prefix     string
+		err        error
+		number     int
+	)
 
-		accountList, err := os.OpenFile(path.Join(prefix, "addresses"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
+	prefix = ctx.String(keystoreFlag.Name)
+	// Create keystore directory if not exist
+	if _, err := os.Stat(prefix); os.IsNotExist(err) {
+		os.MkdirAll(prefix, 0700)
+	}
+
+	accountList, err := os.OpenFile(path.Join(prefix, "addresses"), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0777)
+	if err != nil {
+		logger.Error("open addresses file failed")
+		return err
+	}
+	number = ctx.Int("number")
+	if number > 1 {
+		logger.Infof("Generate %d ethereum account required\n", number)
+	}
+
+	for i := 0; i < number; i++ {
+		privateKey, err = crypto.GenerateKey()
 		if err != nil {
-			logger.Error("open addresses file failed")
-			return err
+			logger.Error("Failed to generate random private key", err)
 		}
-		number = ctx.Int("number")
-		if number > 1 {
-			logger.Infof("Generate %d ethereum account required\n", number)
+		// Create the keyfile object with a random UUID.
+		id := uuid.NewRandom()
+		key := &keystore.Key{
+			Id:         id,
+			Address:    crypto.PubkeyToAddress(privateKey.PublicKey),
+			PrivateKey: privateKey,
 		}
 
-		for i := 0; i < number; i++ {
-			privateKey, err = crypto.GenerateKey()
-			if err != nil {
-				logger.Error("Failed to generate random private key", err)
-			}
-			// Create the keyfile object with a random UUID.
-			id := uuid.NewRandom()
-			key := &keystore.Key{
-				Id:         id,
-				Address:    crypto.PubkeyToAddress(privateKey.PublicKey),
-				PrivateKey: privateKey,
-			}
-
-			// Encrypt key with passphrase.
-			passphrase := getPassphrase(ctx, true)
-			keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
-			if err != nil {
-				logger.Error("Error encrypting key", err)
-				continue
-			}
-
-			keyfilepath := keystore.KeyFileName(key.Address)
-			keyfilepath = path.Join(prefix, keyfilepath)
-			// Store the file to disk.
-			if err := os.MkdirAll(filepath.Dir(keyfilepath), 0700); err != nil {
-				logger.Errorf("Could not create directory %s\n", filepath.Dir(keyfilepath))
-				continue
-			}
-			if err := ioutil.WriteFile(keyfilepath, keyjson, 0600); err != nil {
-				logger.Errorf("Failed to write keyfile to %s: %v\n", keyfilepath, err)
-				continue
-			}
-
-			// Output some information.
-			logger.Notice("Address:", key.Address.Hex())
-			accountList.WriteString(key.Address.Hex() + "\n")
+		// Encrypt key with passphrase.
+		passphrase := getPassphrase(ctx, true)
+		keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
+		if err != nil {
+			logger.Error("Error encrypting key", err)
+			continue
 		}
-		return nil
-	},
+
+		keyfilepath := keystore.KeyFileName(key.Address)
+		keyfilepath = path.Join(prefix, keyfilepath)
+		// Store the file to disk.
+		if err := os.MkdirAll(filepath.Dir(keyfilepath), 0700); err != nil {
+			logger.Errorf("Could not create directory %s\n", filepath.Dir(keyfilepath))
+			continue
+		}
+		if err := ioutil.WriteFile(keyfilepath, keyjson, 0600); err != nil {
+			logger.Errorf("Failed to write keyfile to %s: %v\n", keyfilepath, err)
+			continue
+		}
+
+		// Output some information.
+		logger.Notice("Address:", key.Address.Hex())
+		accountList.WriteString(key.Address.Hex() + "\n")
+	}
+	return nil
 }

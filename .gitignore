@@ -26,3 +26,4 @@ build/_vendor/pkg
 profile.tmp
 profile.cov
 .idea
+ethclient

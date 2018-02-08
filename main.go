@@ -32,6 +32,8 @@ func init() {
 	app = createCommandLineApp()
 	app.Commands = []cli.Command{
 		commandGenerate,
+		commandSend,
+		commandSendBatch,
 	}
 }
 

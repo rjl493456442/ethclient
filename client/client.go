@@ -1,5 +1,5 @@
 // Copyright 2016-2017 Hyperchain Corp.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -17,7 +17,7 @@ package client
 import "github.com/ethereum/go-ethereum/ethclient"
 
 type Client struct {
-	c *ethclient.Client
+	Cli *ethclient.Client
 }
 
 func NewClient(url string) (*Client, error) {
@@ -26,6 +26,6 @@ func NewClient(url string) (*Client, error) {
 		return nil, err
 	}
 	return &Client{
-		c: cli,
+		Cli: cli,
 	}, nil
 }
