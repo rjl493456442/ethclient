@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "UCCvhzuqKGAz0VOytCN5x6eM50o=",
+			"path": "github.com/360EntSecGroup-Skylar/excelize",
+			"revision": "76219275737f28d1b58ac4c693c5e8f59daf53fd",
+			"revisionTime": "2018-02-03T07:02:37Z"
+		},
+		{
 			"checksumSHA1": "USkefO0g1U9mr+8hagv3fpSkrxg=",
 			"origin": "github.com/ethereum/go-ethereum/vendor/github.com/aristanetworks/goarista/monotime",
 			"path": "github.com/aristanetworks/goarista/monotime",

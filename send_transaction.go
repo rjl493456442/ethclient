@@ -18,6 +18,7 @@ import (
 	"errors"
 	"math/big"
 	"time"
+	"context"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -30,6 +31,7 @@ import (
 
 var (
 	errInvalidArguments = errors.New("invalid transaction or call arguments")
+	errWaitTimeout = errors.New("wait transaction mined timeout")
 )
 
 var commandSend = cli.Command{
@@ -40,11 +42,11 @@ var commandSend = cli.Command{
 		passphraseFileFlag,
 		keystoreFlag,
 		clientFlag,
-		chainFlag,
 		senderFlag,
 		receiverFlag,
 		valueFlag,
 		dataFlag,
+		syncFlag,
 	},
 	Action: Send,
 }
@@ -55,7 +57,6 @@ var commandSendBatch = cli.Command{
 	Flags: []cli.Flag{
 		keystoreFlag,
 		clientFlag,
-		chainFlag,
 	},
 	Action: SendBatch,
 }
@@ -66,7 +67,6 @@ func Send(ctx *cli.Context) error {
 		receiver = ctx.String(receiverFlag.Name)
 		value    = ctx.Int(valueFlag.Name)
 		data     = ctx.String(dataFlag.Name)
-		chainId  = ctx.Int(chainFlag.Name)
 	)
 	// Construct call message
 	if !CheckArguments(sender, receiver, value, data) {
@@ -89,7 +89,7 @@ func Send(ctx *cli.Context) error {
 	}
 	keystore := getKeystore(ctx)
 
-	return sendTransaction(client, callMsg, passphrase, keystore, big.NewInt(int64(chainId)), false)
+	return sendTransaction(client, callMsg, passphrase, keystore, ctx.Bool(syncFlag.Name))
 }
 
 func SendBatch(ctx *cli.Context) error {
@@ -97,8 +97,8 @@ func SendBatch(ctx *cli.Context) error {
 }
 
 // sendTransaction send a transaction with given call message and fill with sufficient fields like account nonce.
-func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphrase string, keystore *keystore.KeyStore, chainId *big.Int, wait bool) error {
-	gasPrice, gasLimit, nonce, err := fetchParams(client, callMsg)
+func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphrase string, keystore *keystore.KeyStore, wait bool) error {
+	gasPrice, gasLimit, nonce, chainId, err := fetchParams(client, callMsg)
 	if err != nil {
 		return err
 	}
@@ -117,33 +117,69 @@ func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphras
 	if err := client.Cli.SendTransaction(timeoutContext, tx); err != nil {
 		return err
 	}
-
-	if wait {
-		// TODO Wait the transaction been mined and fetch the receipt.
-	}
 	logger.Noticef("sendTransaction, hash=%s", tx.Hash().Hex())
+
+	// Wait for the mining
+	if wait {
+		timeoutContext, _ := makeTimeoutContext(60 * time.Second)
+		receipt, err := waitMined(timeoutContext, client, tx.Hash())
+		if err != nil {
+			logger.Notice("wait transaction receipt failed")
+		} else {
+			logger.Noticef("transaction receipt=%s", receipt.String())
+		}
+	}
 	return nil
 }
 
 // fetchParams returns estimated gas limit, suggested gas price and sender pending nonce.
-func fetchParams(client *client.Client, callMsg *ethereum.CallMsg) (*big.Int, uint64, uint64, error) {
+func fetchParams(client *client.Client, callMsg *ethereum.CallMsg) (*big.Int, uint64, uint64, *big.Int, error) {
 	timeoutContext, _ := makeTimeoutContext(5 * time.Second)
 	// Gas estimation
 	gasLimit, err := client.Cli.EstimateGas(timeoutContext, *callMsg)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, nil, err
 	}
 
 	// Suggestion gas price
 	timeoutContext, _ = makeTimeoutContext(5 * time.Second)
 	gasPrice, err := client.Cli.SuggestGasPrice(timeoutContext)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, nil, err
 	}
+
+	// Account Nonce
 	timeoutContext, _ = makeTimeoutContext(5 * time.Second)
 	nonce, err := client.Cli.PendingNonceAt(timeoutContext, callMsg.From)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, nil, err
 	}
-	return gasPrice, gasLimit, nonce, nil
+
+	// Chain Id
+	timeoutContext, _ = makeTimeoutContext(5 * time.Second)
+	chainId, err := client.Cli.NetworkID(timeoutContext)
+	if err != nil {
+		return nil, 0, 0, nil, err
+	}
+	// TODO Use cache to improve query efficiency
+	return gasPrice, gasLimit, nonce, chainId, nil
 }
+
+// waitMined waits the transaction been mined and fetch the receipt.
+// An error will been returned if waiting exceeds the given timeout
+func waitMined(ctx context.Context, client *client.Client, txHash common.Hash) (*types.Receipt, error) {
+	for {
+		receipt, err := client.Cli.TransactionReceipt(ctx, txHash)
+		if receipt == nil || err != nil {
+			time.Sleep(1 * time.Second)
+		} else {
+			return receipt, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, errWaitTimeout
+		default:
+		}
+	}
+}
+

@@ -48,11 +48,6 @@ var (
 		Name:  "url",
 		Usage: "remote ethereum server url, http/https/ws/ipc are all supported",
 	}
-	chainFlag = cli.IntFlag{
-		Name:  "chainId",
-		Usage: "ethereum network id, 1 for Mainnet network, 3 for Ropsten test network, 4 for Rinkeby test network",
-		Value: 1,
-	}
 	senderFlag = cli.StringFlag{
 		Name:  "sender",
 		Usage: "transaction sender address",
@@ -68,6 +63,10 @@ var (
 	dataFlag = cli.StringFlag{
 		Name:  "data",
 		Usage: "contract invocation payload",
+	}
+	syncFlag = cli.BoolFlag{
+		Name:  "sync",
+		Usage: "wait until the sending transaction been mined",
 	}
 )
 
