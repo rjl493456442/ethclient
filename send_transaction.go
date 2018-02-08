@@ -15,10 +15,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"math/big"
+	"os"
+	"strings"
 	"time"
-	"context"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -30,8 +32,9 @@ import (
 )
 
 var (
-	errInvalidArguments = errors.New("invalid transaction or call arguments")
-	errWaitTimeout = errors.New("wait transaction mined timeout")
+	errInvalidArguments  = errors.New("invalid transaction or call arguments")
+	errWaitTimeout       = errors.New("wait transaction mined timeout")
+	errInvalidBatchIndex = errors.New("invalid batch index")
 )
 
 var commandSend = cli.Command{
@@ -55,12 +58,18 @@ var commandSendBatch = cli.Command{
 	Name:        "sendBatch",
 	Description: "Send a batch of transaction to specified ethereum server",
 	Flags: []cli.Flag{
+		passphraseFlag,
+		passphraseFileFlag,
 		keystoreFlag,
 		clientFlag,
+		batchFileFlag,
+		batchIndexBeginFlag,
+		batchIndexEndFlag,
 	},
 	Action: SendBatch,
 }
 
+// Send sends a transaction with specified fields.
 func Send(ctx *cli.Context) error {
 	var (
 		sender   = ctx.String(senderFlag.Name)
@@ -92,11 +101,75 @@ func Send(ctx *cli.Context) error {
 	return sendTransaction(client, callMsg, passphrase, keystore, ctx.Bool(syncFlag.Name))
 }
 
+// SendBatch sends a batch of specified transactions to ethereum server.
 func SendBatch(ctx *cli.Context) error {
+	var (
+		batchfile = getBatchFile(ctx)
+	)
+	if _, err := os.Stat(batchfile); os.IsNotExist(err) {
+		return err
+	}
+
+	var (
+		reader Reader
+		err    error
+		begin  int
+		end    int
+	)
+	switch strings.HasSuffix(batchfile, ".xlsx") {
+	case true:
+		reader, err = NewExcelReader(batchfile, getSheetId(ctx))
+	default:
+		reader, err = NewRawTextReader(batchfile)
+	}
+	if err != nil {
+		return err
+	}
+
+	entries, err := reader.ReadAll()
+	if err != nil {
+		return err
+	}
+	// Read begin, end index for batch file
+	begin, end = ctx.Int(batchIndexBeginFlag.Name), ctx.Int(batchIndexEndFlag.Name)
+	if end == 0 {
+		end = len(entries)
+	}
+
+	if begin >= end {
+		return errInvalidBatchIndex
+	}
+
+	entries = entries[begin:end]
+
+	// Setup rpc client
+	client, err := getClient(ctx)
+	if err != nil {
+		return err
+	}
+	keystore := getKeystore(ctx)
+
+	for _, entry := range entries {
+		// Construct call message
+		if !CheckArguments(entry.From.Hex(), entry.To.Hex(), int(entry.Value), common.Bytes2Hex(entry.Data)) {
+			return errInvalidArguments
+		}
+		callMsg := &ethereum.CallMsg{
+			From:  entry.From,
+			To:    &entry.To,
+			Value: big.NewInt(entry.Value),
+			Data:  entry.Data,
+		}
+		if entry.Passphrase == "" {
+			entry.Passphrase = getPassphrase(ctx, false)
+		}
+		// Never wait during the batch sending
+		sendTransaction(client, callMsg, entry.Passphrase, keystore, false)
+	}
 	return nil
 }
 
-// sendTransaction send a transaction with given call message and fill with sufficient fields like account nonce.
+// sendTransaction sends a transaction with given call message and fill with sufficient fields like account nonce.
 func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphrase string, keystore *keystore.KeyStore, wait bool) error {
 	gasPrice, gasLimit, nonce, chainId, err := fetchParams(client, callMsg)
 	if err != nil {
@@ -182,4 +255,3 @@ func waitMined(ctx context.Context, client *client.Client, txHash common.Hash) (
 		}
 	}
 }
-

@@ -68,6 +68,24 @@ var (
 		Name:  "sync",
 		Usage: "wait until the sending transaction been mined",
 	}
+	batchFileFlag = cli.StringFlag{
+		Name:  "batchfile",
+		Usage: "file path for batch transaction sending defail",
+	}
+	batchIndexBeginFlag = cli.IntFlag{
+		Name:  "batchstart",
+		Usage: "beginning index for batch transaction sending. If not specifed, the default value is 0",
+		Value: 0,
+	}
+	batchIndexEndFlag = cli.IntFlag{
+		Name:  "batchend",
+		Usage: "end index for batch transaction sending. If not specified, the default value is len(entries) - 1",
+		Value: 0,
+	}
+	sheetFlag = cli.StringFlag{
+		Name:  "sheet",
+		Usage: "excel file sheet id",
+	}
 )
 
 // CheckArguments make sure the arguments assigned are valid.
@@ -163,6 +181,29 @@ func getKeystore(ctx *cli.Context) *keystore.KeyStore {
 	path := ctx.String(keystoreFlag.Name)
 	keystore := keystore.NewKeyStore(path, keystore.StandardScryptN, keystore.StandardScryptP)
 	return keystore
+}
+
+// getBatchFile extracts batch file path from command line input or console input.
+func getBatchFile(ctx *cli.Context) string {
+	path := ctx.String(batchFileFlag.Name)
+	if path == "" {
+		// Read from the console input
+		prompt := promptui.Prompt{
+			Label: "Batchfile path",
+		}
+		path, _ = prompt.Run()
+	}
+	return path
+}
+
+// getSheetId returns excel sheet id from command line input.
+// If no specified, use the default sheet id.
+func getSheetId(ctx *cli.Context) string {
+	sheet := ctx.String(sheetFlag.Name)
+	if sheet == "" {
+		sheet = DefaultSheet
+	}
+	return sheet
 }
 
 // makeContext returns background context.
