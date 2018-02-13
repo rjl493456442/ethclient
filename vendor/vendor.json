@@ -270,6 +270,7 @@
 			"revisionTime": "2018-02-04T14:29:40Z"
 		},
 		{
+			"checksumSHA1": "uTQtOqR0ePMMcvuvAIksiIZxhqU=",
 			"path": "golang.org/x/sys/unix",
 			"revision": ""
 		},

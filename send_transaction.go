@@ -130,7 +130,6 @@ func SendBatch(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
 	entries, err := reader.ReadAll()
 	if err != nil {
 		return err
@@ -146,7 +145,6 @@ func SendBatch(ctx *cli.Context) error {
 	}
 
 	entries = entries[begin:end]
-
 	// Setup rpc client
 	client, err := getClient(ctx)
 	if err != nil {
@@ -194,7 +192,6 @@ func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphras
 	} else {
 		tx = types.NewTransaction(nonce, *callMsg.To, callMsg.Value, callMsg.Gas, callMsg.GasPrice, callMsg.Data)
 	}
-
 	// Sign transaction
 	tx, err = keystore.SignTxWithPassphrase(accounts.Account{Address: callMsg.From}, passphrase, tx, chainId)
 	if err != nil {

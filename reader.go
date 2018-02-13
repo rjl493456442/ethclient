@@ -33,6 +33,10 @@ var (
 	errEmptyFileContent = errors.New("empty file content")
 )
 
+const (
+	fieldNumber = 5 // total field number of transaction in batch file
+)
+
 // ErrCorrupted describes error due to corruption. This error will be wrapped
 // with errors.ErrCorrupted.
 type ErrCorrupted struct {
@@ -52,6 +56,8 @@ type TransactionParams struct {
 	To         common.Address `json:"to"`
 	Value      int64          `json:"value"`
 	Data       []byte         `json:"data"`
+	Hash       common.Hash    `json:"hash"`
+	Status     bool           `json:"status"`
 	Passphrase string         `json:"passphrase"`
 }
 
@@ -116,10 +122,10 @@ func (reader *ExcelReader) ReadAll() ([]TransactionParams, error) {
 }
 
 func (reader *ExcelReader) parseRow(row []string, idx int) (TransactionParams, error) {
-	if len(row) != 5 {
+	if len(row) != fieldNumber {
 		return TransactionParams{}, errInvalidContent
 	}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < fieldNumber; i++ {
 		// Remove all leading and trailing blank char
 		row[i] = strings.Trim(row[i], " ")
 	}
@@ -201,11 +207,11 @@ func (reader *RawTextReader) ReadAll() ([]TransactionParams, error) {
 
 func (reader *RawTextReader) parseLine(line string, idx int) (TransactionParams, error) {
 	substr := strings.Split(line, ",")
-	if len(substr) != 5 {
+	if len(substr) != fieldNumber {
 		logger.Errorf("Corrupted raw text line at %d", idx)
 		return TransactionParams{}, errInvalidContent
 	}
-	for i := 0; i < 5; i++ {
+	for i := 0; i < fieldNumber; i++ {
 		// Remove all leading and trailing blank char
 		substr[i] = strings.Trim(substr[i], " ")
 	}
