@@ -26,7 +26,7 @@ go install
 **1. Check out the help manaul**
 
 ```Shell
-$ ethclient -h
+$ ethclient
 NAME:
    ethclient - ethclient is an easy ethereum client, with which user can interactive with ethereum client easily
 
@@ -40,9 +40,10 @@ AUTHOR:
    Gary rong <garyrong0905@gmail.com>
 
 COMMANDS:
-     generate   generate new keyfile
-     send
-     sendBatch
+     generate   Generate new keyfile
+     send       Send transaction to ethereum network
+     sendBatch  Send batch of transactions to ethereum network
+     call       Execute a message call transaction in the remote node's VM
      help, h    Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
@@ -96,7 +97,21 @@ $ ethclient sendBatch --keystore ~/project/bigdreamer/test/keystore --url http:/
 20:08:55.399 send_transaction.go:193 ▶ NOTI  sendTransaction, hash=0xae661a83cf7b0d556c25bbb0bcbce43f9cdf7dd4327f01eb405fe6cf2672ebb7
 ```
 
-**5. Generate invocation payload**
+**5. Call**
+
+Executes a new message call immediately without creating a transaction on the block chain.
+
+```Shell
+ethclient call --sender 0x17a985dBC716F06E99c6C3fA38f452C21C8835F0 --receiver 0xe4d45e90961a78b5db9eed5ea744d5e52986fcbc --data 0x93423e9c0000000000000000000000000000000000000000000000000000000001234567 --url http://172.16.5.3:9999
+
+21:04:14.437 call.go:70 ▶ NOTI  Result=00000000000000000000000000000000000000000000000000000000773593ff
+```
+
+You have to decode the result by yourself.
+
+> Decode function is still under the development.
+
+**6. Generate invocation payload**
 
 Ethereum users can always find that encode the invocation params to the payload is troublesome. So we provide a command line tool for users to generate payload easily.
 

@@ -15,19 +15,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"context"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/manifoldco/promptui"
 	"github.com/rjl493456442/ethclient/client"
 	"gopkg.in/urfave/cli.v1"
-	"time"
 )
 
 var (

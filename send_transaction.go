@@ -39,6 +39,7 @@ var (
 
 var commandSend = cli.Command{
 	Name:        "send",
+	Usage:       "Send transaction to ethereum network",
 	Description: "Send transaction to connected ethereum node with specified arguments",
 	Flags: []cli.Flag{
 		passphraseFlag,
@@ -56,7 +57,8 @@ var commandSend = cli.Command{
 
 var commandSendBatch = cli.Command{
 	Name:        "sendBatch",
-	Description: "Send a batch of transaction to specified ethereum server",
+	Usage:       "Send batch of transactions to ethereum network",
+	Description: "Send a batch of transactions to specified ethereum server",
 	Flags: []cli.Flag{
 		passphraseFlag,
 		passphraseFileFlag,
@@ -87,6 +89,9 @@ func Send(ctx *cli.Context) error {
 		To:    &to,
 		Value: big.NewInt(int64(value)),
 		Data:  common.FromHex(data),
+	}
+	if receiver == "" {
+		callMsg.To = nil
 	}
 	// Extract password
 	passphrase := getPassphrase(ctx, false)
@@ -160,6 +165,9 @@ func SendBatch(ctx *cli.Context) error {
 			Value: big.NewInt(entry.Value),
 			Data:  entry.Data,
 		}
+		if entry.To.Hex() == "" {
+			callMsg.To = nil
+		}
 		if entry.Passphrase == "" {
 			entry.Passphrase = getPassphrase(ctx, false)
 		}
@@ -177,9 +185,15 @@ func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphras
 	if err != nil {
 		return err
 	}
+	var tx *types.Transaction
 	callMsg.Gas = gasLimit
 	callMsg.GasPrice = gasPrice
-	tx := types.NewTransaction(nonce, *callMsg.To, callMsg.Value, callMsg.Gas, callMsg.GasPrice, callMsg.Data)
+
+	if callMsg.To == nil {
+		tx = types.NewContractCreation(nonce, callMsg.Value, callMsg.Gas, callMsg.GasPrice, callMsg.Data)
+	} else {
+		tx = types.NewTransaction(nonce, *callMsg.To, callMsg.Value, callMsg.Gas, callMsg.GasPrice, callMsg.Data)
+	}
 
 	// Sign transaction
 	tx, err = keystore.SignTxWithPassphrase(accounts.Account{Address: callMsg.From}, passphrase, tx, chainId)

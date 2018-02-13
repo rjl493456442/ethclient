@@ -34,6 +34,7 @@ func init() {
 		commandGenerate,
 		commandSend,
 		commandSendBatch,
+		commandCall,
 	}
 }
 

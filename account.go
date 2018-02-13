@@ -34,7 +34,7 @@ var (
 
 var commandGenerate = cli.Command{
 	Name:        "generate",
-	Usage:       "generate new keyfile",
+	Usage:       "Generate new keyfile",
 	Description: "Generate one or a batch of new keyfile.",
 	Flags: []cli.Flag{
 		passphraseFlag,
