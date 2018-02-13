@@ -164,7 +164,9 @@ func SendBatch(ctx *cli.Context) error {
 			entry.Passphrase = getPassphrase(ctx, false)
 		}
 		// Never wait during the batch sending
-		sendTransaction(client, callMsg, entry.Passphrase, keystore, false)
+		if err := sendTransaction(client, callMsg, entry.Passphrase, keystore, false); err != nil {
+			logger.Error(err)
+		}
 	}
 	return nil
 }
