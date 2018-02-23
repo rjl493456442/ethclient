@@ -19,6 +19,7 @@ import (
 	"errors"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -103,34 +104,33 @@ func Send(ctx *cli.Context) error {
 	}
 	keystore := getKeystore(ctx)
 
-	return sendTransaction(client, callMsg, passphrase, keystore, ctx.Bool(syncFlag.Name))
+	_, err = sendTransaction(client, callMsg, passphrase, keystore, ctx.Bool(syncFlag.Name))
+	return err
 }
 
 // SendBatch sends a batch of specified transactions to ethereum server.
 func SendBatch(ctx *cli.Context) error {
 	var (
 		batchfile = getBatchFile(ctx)
+		rw        RWriter
+		err       error
+		begin     int
+		end       int
 	)
 	if _, err := os.Stat(batchfile); os.IsNotExist(err) {
 		return err
 	}
 
-	var (
-		reader Reader
-		err    error
-		begin  int
-		end    int
-	)
 	switch strings.HasSuffix(batchfile, ".xlsx") {
 	case true:
-		reader, err = NewExcelReader(batchfile, getSheetId(ctx))
+		rw, err = NewExcelRWriter(batchfile, getSheetId(ctx))
 	default:
-		reader, err = NewRawTextReader(batchfile)
+		rw, err = NewRawTextRWriter(batchfile)
 	}
 	if err != nil {
 		return err
 	}
-	entries, err := reader.ReadAll()
+	entries, err := rw.ReadAll()
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func SendBatch(ctx *cli.Context) error {
 	}
 	keystore := getKeystore(ctx)
 
-	for _, entry := range entries {
+	for idx, entry := range entries {
 		// Construct call message
 		if !CheckArguments(entry.From.Hex(), entry.To.Hex(), int(entry.Value), common.Bytes2Hex(entry.Data)) {
 			return errInvalidArguments
@@ -170,18 +170,35 @@ func SendBatch(ctx *cli.Context) error {
 			entry.Passphrase = getPassphrase(ctx, false)
 		}
 		// Never wait during the batch sending
-		if err := sendTransaction(client, callMsg, entry.Passphrase, keystore, false); err != nil {
+		if hash, err := sendTransaction(client, callMsg, entry.Passphrase, keystore, false); err != nil {
 			logger.Error(err)
+		} else {
+			// Record the hash to batch file
+			var (
+				actualIdx = idx + begin
+				axis      string
+			)
+			switch rw.(type) {
+			case *ExcelRWriter:
+				axis = "F" + strconv.Itoa(actualIdx+2)
+			case *RawTextRWriter:
+				axis = strconv.Itoa(actualIdx)
+			}
+			err = rw.WriteString(axis, hash.Hex())
+			if err != nil {
+				logger.Error(err)
+			}
 		}
 	}
+	rw.Flush()
 	return nil
 }
 
 // sendTransaction sends a transaction with given call message and fill with sufficient fields like account nonce.
-func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphrase string, keystore *keystore.KeyStore, wait bool) error {
+func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphrase string, keystore *keystore.KeyStore, wait bool) (common.Hash, error) {
 	gasPrice, gasLimit, nonce, chainId, err := fetchParams(client, callMsg)
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 	var tx *types.Transaction
 	callMsg.Gas = gasLimit
@@ -195,13 +212,13 @@ func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphras
 	// Sign transaction
 	tx, err = keystore.SignTxWithPassphrase(accounts.Account{Address: callMsg.From}, passphrase, tx, chainId)
 	if err != nil {
-		return err
+		return common.Hash{}, err
 	}
 
 	// Send transaction
 	timeoutContext, _ := makeTimeoutContext(5 * time.Second)
 	if err := client.Cli.SendTransaction(timeoutContext, tx); err != nil {
-		return err
+		return common.Hash{}, err
 	}
 	logger.Noticef("sendTransaction, hash=%s", tx.Hash().Hex())
 
@@ -215,7 +232,7 @@ func sendTransaction(client *client.Client, callMsg *ethereum.CallMsg, passphras
 			logger.Noticef("transaction receipt=%s", receipt.String())
 		}
 	}
-	return nil
+	return tx.Hash(), nil
 }
 
 // fetchParams returns estimated gas limit, suggested gas price and sender pending nonce.

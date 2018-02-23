@@ -25,12 +25,14 @@ import (
 
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/ethereum/go-ethereum/common"
+	"io/ioutil"
 )
 
 var (
 	errEmptycanner      = errors.New("empty scanner")
 	errInvalidContent   = errors.New("invalid file content")
 	errEmptyFileContent = errors.New("empty file content")
+	errRowIndexExceed   = errors.New("row index exceed")
 )
 
 const (
@@ -56,14 +58,24 @@ type TransactionParams struct {
 	To         common.Address `json:"to"`
 	Value      int64          `json:"value"`
 	Data       []byte         `json:"data"`
+	Passphrase string         `json:"passphrase"`
 	Hash       common.Hash    `json:"hash"`
 	Status     bool           `json:"status"`
-	Passphrase string         `json:"passphrase"`
 }
 
 type Reader interface {
 	Read() (TransactionParams, error)
 	ReadAll() ([]TransactionParams, error)
+}
+
+type Writer interface {
+	WriteString(axis string, value string) error
+	Flush() error
+}
+
+type RWriter interface {
+	Reader
+	Writer
 }
 
 /*
@@ -122,7 +134,7 @@ func (reader *ExcelReader) ReadAll() ([]TransactionParams, error) {
 }
 
 func (reader *ExcelReader) parseRow(row []string, idx int) (TransactionParams, error) {
-	if len(row) != fieldNumber {
+	if len(row) < fieldNumber {
 		return TransactionParams{}, errInvalidContent
 	}
 	for i := 0; i < fieldNumber; i++ {
@@ -134,13 +146,82 @@ func (reader *ExcelReader) parseRow(row []string, idx int) (TransactionParams, e
 		logger.Errorf("Corrupted raw text line at %d, invalid transfer value %s", idx, value)
 		return TransactionParams{}, err
 	}
-	return TransactionParams{
+	param := TransactionParams{
 		From:       common.HexToAddress(row[0]),
 		To:         common.HexToAddress(row[1]),
 		Value:      value,
 		Data:       common.FromHex(row[3]),
 		Passphrase: row[4],
+	}
+	// Parse extra fields
+	if len(row) >= fieldNumber+1 {
+		param.Hash = common.HexToHash(row[5])
+	}
+	return param, nil
+}
+
+type ExcelWriter struct {
+	fd    *excelize.File
+	sheet string
+	idx   int
+}
+
+func NewExcelWriter(filename string, sheet string) (Writer, error) {
+	fd, err := excelize.OpenFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	return &ExcelWriter{
+		fd:    fd,
+		sheet: sheet,
+		idx:   0,
 	}, nil
+}
+
+func (writer *ExcelWriter) WriteString(axis string, value string) error {
+	writer.fd.SetCellValue(writer.sheet, axis, value)
+	return nil
+}
+
+func (writer *ExcelWriter) Flush() error {
+	return writer.fd.Save()
+}
+
+type ExcelRWriter struct {
+	writer Writer
+	reader Reader
+}
+
+func NewExcelRWriter(filename string, sheet string) (RWriter, error) {
+	writer, err := NewExcelWriter(filename, sheet)
+	if err != nil {
+		return nil, err
+	}
+
+	reader, err := NewExcelReader(filename, sheet)
+	if err != nil {
+		return nil, err
+	}
+	return &ExcelRWriter{
+		writer: writer,
+		reader: reader,
+	}, nil
+}
+
+func (rw *ExcelRWriter) Read() (TransactionParams, error) {
+	return rw.reader.Read()
+}
+
+func (rw *ExcelRWriter) ReadAll() ([]TransactionParams, error) {
+	return rw.reader.ReadAll()
+}
+
+func (rw *ExcelRWriter) WriteString(axis string, value string) error {
+	return rw.writer.WriteString(axis, value)
+}
+
+func (rw *ExcelRWriter) Flush() error {
+	return rw.writer.Flush()
 }
 
 /*
@@ -207,7 +288,7 @@ func (reader *RawTextReader) ReadAll() ([]TransactionParams, error) {
 
 func (reader *RawTextReader) parseLine(line string, idx int) (TransactionParams, error) {
 	substr := strings.Split(line, ",")
-	if len(substr) != fieldNumber {
+	if len(substr) < fieldNumber {
 		logger.Errorf("Corrupted raw text line at %d", idx)
 		return TransactionParams{}, errInvalidContent
 	}
@@ -220,11 +301,94 @@ func (reader *RawTextReader) parseLine(line string, idx int) (TransactionParams,
 		logger.Errorf("Corrupted raw text line at %d, invalid transfer value %s", idx, value)
 		return TransactionParams{}, err
 	}
-	return TransactionParams{
+	param := TransactionParams{
 		From:       common.HexToAddress(substr[0]),
 		To:         common.HexToAddress(substr[1]),
 		Value:      value,
 		Data:       common.FromHex(substr[3]),
 		Passphrase: substr[4],
+	}
+	// Parse extra fields
+	if len(substr) >= fieldNumber+1 {
+		param.Hash = common.HexToHash(substr[5])
+	}
+	return param, nil
+}
+
+type RawTextWriter struct {
+	fd    *os.File
+	lines []string
+}
+
+func NewRawTextWriter(filename string) (Writer, error) {
+	fd, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	content, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(content), "\n")
+	return &RawTextWriter{
+		fd:    fd,
+		lines: lines,
 	}, nil
+}
+
+// WriteString writes the value to specific line.
+// Using string as the index is due to interface uniform.
+func (writer *RawTextWriter) WriteString(s string, value string) error {
+	idx, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	if idx < 0 || idx >= len(writer.lines) {
+		return errRowIndexExceed
+	}
+	line := writer.lines[idx]
+	line += fmt.Sprintf(", %s", value)
+	writer.lines[idx] = line
+	return nil
+}
+
+func (writer *RawTextWriter) Flush() error {
+	out := strings.Join(writer.lines, "\n")
+	return ioutil.WriteFile(writer.fd.Name(), []byte(out), 0644)
+}
+
+type RawTextRWriter struct {
+	reader Reader
+	writer Writer
+}
+
+func NewRawTextRWriter(filename string) (RWriter, error) {
+	writer, err := NewRawTextWriter(filename)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := NewRawTextReader(filename)
+	if err != nil {
+		return nil, err
+	}
+	return &RawTextRWriter{
+		reader: reader,
+		writer: writer,
+	}, nil
+}
+
+func (rw *RawTextRWriter) Read() (TransactionParams, error) {
+	return rw.reader.Read()
+}
+
+func (rw *RawTextRWriter) ReadAll() ([]TransactionParams, error) {
+	return rw.reader.ReadAll()
+}
+
+func (rw *RawTextRWriter) WriteString(axis string, value string) error {
+	return rw.writer.WriteString(axis, value)
+}
+
+func (rw *RawTextRWriter) Flush() error {
+	return rw.writer.Flush()
 }
