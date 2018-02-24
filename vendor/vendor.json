@@ -41,6 +41,18 @@
 			"revisionTime": "2018-02-04T14:29:40Z"
 		},
 		{
+			"checksumSHA1": "A1j2dRVCf9RcqsYbtra2Fq8iqtg=",
+			"path": "github.com/ethereum/go-ethereum/accounts/abi",
+			"revision": "a1984ce727642b1989657b9eb430562d47f89c70",
+			"revisionTime": "2018-02-22T22:15:13Z"
+		},
+		{
+			"checksumSHA1": "VHN2nuZKDIg6eAXFfSMJk+/1ufk=",
+			"path": "github.com/ethereum/go-ethereum/accounts/abi/bind",
+			"revision": "a1984ce727642b1989657b9eb430562d47f89c70",
+			"revisionTime": "2018-02-22T22:15:13Z"
+		},
+		{
 			"checksumSHA1": "o804uTWnNn99w+GjNwKv+cYSIzE=",
 			"path": "github.com/ethereum/go-ethereum/accounts/keystore",
 			"revision": "dffcc83f0dde9e7f44a36bddc501aad54cb1d368",
