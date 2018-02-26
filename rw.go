@@ -57,7 +57,7 @@ type TransactionParams struct {
 	From       common.Address `json:"from"`
 	To         common.Address `json:"to"`
 	Value      int64          `json:"value"`
-	Data       []byte         `json:"data"`
+	Data       string         `json:"data"`
 	Passphrase string         `json:"passphrase"`
 	Hash       common.Hash    `json:"hash"`
 	Status     bool           `json:"status"`
@@ -150,7 +150,7 @@ func (reader *ExcelReader) parseRow(row []string, idx int) (TransactionParams, e
 		From:       common.HexToAddress(row[0]),
 		To:         common.HexToAddress(row[1]),
 		Value:      value,
-		Data:       common.FromHex(row[3]),
+		Data:       row[3],
 		Passphrase: row[4],
 	}
 	// Parse extra fields
@@ -305,7 +305,7 @@ func (reader *RawTextReader) parseLine(line string, idx int) (TransactionParams,
 		From:       common.HexToAddress(substr[0]),
 		To:         common.HexToAddress(substr[1]),
 		Value:      value,
-		Data:       common.FromHex(substr[3]),
+		Data:       substr[3],
 		Passphrase: substr[4],
 	}
 	// Parse extra fields

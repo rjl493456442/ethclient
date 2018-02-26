@@ -47,6 +47,7 @@ func TestParse(t *testing.T) {
 	var (
 		cmdBalanceOf = "#BALANCEOF RDN 0x8f0909ccb296ebd319834edb0d5785794b781d7f"
 		cmdTransfer  = "#TRANSFER RDN 100"
+		cmdPercentageTransfer = "#TRANSFER RDN 50%"
 	)
 	cli, err := client.NewClient("http://172.16.5.3:9999")
 	if err != nil {
@@ -72,6 +73,15 @@ func TestParse(t *testing.T) {
 	// Ignore decimal returned here.
 	if !checkEqual(addr, common.HexToAddress("0xe10f51424adbead82eb4b9ae72c29828dc24188f"),
 		payload, "a9059cbb0000000000000000000000008f0909ccb296ebd319834edb0d5785794b781d7f0000000000000000000000000000000000000000000000056bc75e2d63100000",
+		decimal, 0) {
+		t.Error("invalid parse result")
+	}
+	addr, payload, decimal, err = parser.Parse(cmdPercentageTransfer, "0xadd0354d4f5c101685509001053730417321db49", "0x8f0909ccb296ebd319834edb0d5785794b781d7f")
+	if err != nil {
+		t.Error(err)
+	}
+	if !checkEqual(addr, common.HexToAddress("0xe10f51424adbead82eb4b9ae72c29828dc24188f"),
+		payload, "a9059cbb0000000000000000000000008f0909ccb296ebd319834edb0d5785794b781d7f0000000000000000000000000000000000000000019d971e4fe8401e74000000",
 		decimal, 0) {
 		t.Error("invalid parse result")
 	}

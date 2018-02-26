@@ -68,6 +68,7 @@ var commandSendBatch = cli.Command{
 		batchFileFlag,
 		batchIndexBeginFlag,
 		batchIndexEndFlag,
+		tokenfileFlag,
 	},
 	Action: SendBatch,
 }
@@ -81,7 +82,7 @@ func Send(ctx *cli.Context) error {
 		data     = ctx.String(dataFlag.Name)
 	)
 	// Construct call message
-	if !CheckArguments(sender, receiver, value, data) {
+	if !CheckArguments(sender, receiver, value, common.FromHex(data)) {
 		return errInvalidArguments
 	}
 	to := common.HexToAddress(receiver)
@@ -152,17 +153,33 @@ func SendBatch(ctx *cli.Context) error {
 	}
 	keystore := getKeystore(ctx)
 
+	mp, err := getMacroParser(client, ctx.String(tokenfileFlag.Name))
+	if err != nil {
+		return err
+	}
+
 	for idx, entry := range entries {
 		// Construct call message
-		if !CheckArguments(entry.From.Hex(), entry.To.Hex(), int(entry.Value), common.Bytes2Hex(entry.Data)) {
+		if !CheckArguments(entry.From.Hex(), entry.To.Hex(), int(entry.Value), []byte(entry.Data)) {
 			return errInvalidArguments
 		}
+		var data string	= entry.Data
+		var to common.Address = entry.To
+		if mp.isMacroDefinition(data) {
+			to, data, _, err = mp.Parse(data, entry.From.Hex(), entry.To.Hex())
+			if err != nil {
+				logger.Error(err)
+				continue
+			}
+		}
+
 		callMsg := &ethereum.CallMsg{
 			From:  entry.From,
-			To:    &entry.To,
+			To:    &to,
 			Value: big.NewInt(entry.Value),
-			Data:  entry.Data,
+			Data:  common.FromHex(data),
 		}
+
 		if entry.To.Hex() == "" {
 			callMsg.To = nil
 		}
@@ -172,6 +189,7 @@ func SendBatch(ctx *cli.Context) error {
 		// Never wait during the batch sending
 		if hash, err := sendTransaction(client, callMsg, entry.Passphrase, keystore, false); err != nil {
 			logger.Error(err)
+			continue
 		} else {
 			// Record the hash to batch file
 			var (

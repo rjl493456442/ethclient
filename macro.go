@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rjl493456442/ethclient/client"
 	"github.com/rjl493456442/ethclient/resource"
+	"github.com/ethereum/go-ethereum"
 )
 
 const (
@@ -172,6 +173,12 @@ func NewMacroParser(client *client.Client, path string) (*MacroParser, error) {
 	return parser, nil
 }
 
+// isMacroDefinition checks whether the given string is a macro definition.
+func (mp *MacroParser) isMacroDefinition(input string) bool {
+	lines := strings.Split(input, " ")
+	return len(lines) >= 1 && strings.HasPrefix(lines[0], "#")
+}
+
 // Parse parses the given macro definition string and returns a valid contract invocation data.
 func (mp *MacroParser) Parse(input, sender, receiver string) (common.Address, string, int, error) {
 	lines := strings.Split(input, " ")
@@ -220,15 +227,37 @@ func (mp *MacroParser) parseTransfer(lines []string, sender, receiver string) (c
 	} else {
 		return common.Address{}, "", errUnrecognizableTokenSymbol
 	}
+	// Assemble the payload
+	parsed, err := abi.JSON(strings.NewReader(resource.ERC20InterfaceABI))
+	if err != nil {
+		return common.Address{}, "", err
+	}
 
 	if strings.HasSuffix(lines[1], "%") {
-		_, err := strconv.ParseFloat(lines[1][:len(lines[1])-1], 64)
+		percantange, err := strconv.ParseFloat(lines[1][:len(lines[1])-1], 64)
 		if err != nil {
 			return common.Address{}, "", err
 		}
 		// Fetch the balance
-		// TODO
+		// Spawn a balance query
+		query, err := parsed.Pack("balanceOf", common.HexToAddress(sender))
+		if err != nil {
+			return common.Address{}, "", err
+		}
+		to := common.HexToAddress(address)
+		result, err := call(mp.client, &ethereum.CallMsg{
+			From: common.HexToAddress(sender),
+			To:   &to,
+			Data: query,
+		})
+		if err != nil {
+			return common.Address{}, "", err
+		}
 		amount = big.NewInt(0)
+		if err := parsed.Unpack(&amount, "balanceOf", result); err != nil {
+			return common.Address{}, "", err
+		}
+		amount.Mul(amount, big.NewInt(int64(percantange))).Div(amount, big.NewInt(100))
 	} else {
 		v, err := strconv.ParseInt(lines[1], 10, 64)
 		if err != nil {
@@ -236,11 +265,6 @@ func (mp *MacroParser) parseTransfer(lines []string, sender, receiver string) (c
 		}
 		amount = big.NewInt(v)
 		amount.Mul(amount, big.NewInt(int64(math.Pow10(decimal))))
-	}
-	// Assemble the payload
-	parsed, err := abi.JSON(strings.NewReader(resource.ERC20InterfaceABI))
-	if err != nil {
-		return common.Address{}, "", err
 	}
 	input, err := parsed.Pack("transfer", common.HexToAddress(receiver), amount)
 	if err != nil {

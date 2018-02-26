@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/manifoldco/promptui"
 	"github.com/rjl493456442/ethclient/client"
 	"gopkg.in/urfave/cli.v1"
@@ -86,10 +85,14 @@ var (
 		Name:  "sheet",
 		Usage: "excel file sheet id",
 	}
+	tokenfileFlag = cli.StringFlag{
+		Name:  "tokenfile",
+		Usage: "customized token file path which in json format",
+	}
 )
 
 // CheckArguments make sure the arguments assigned are valid.
-func CheckArguments(sender, receiver string, value int, payload string) bool {
+func CheckArguments(sender, receiver string, value int, payload []byte) bool {
 	if strings.HasPrefix(sender, "0x") {
 		sender = sender[2:]
 	}
@@ -102,7 +105,7 @@ func CheckArguments(sender, receiver string, value int, payload string) bool {
 	if receiver != "" && len(receiver) != 40 {
 		return false
 	}
-	if receiver == "" && len(common.FromHex(payload)) == 0 {
+	if receiver == "" && len(payload) == 0 {
 		return false
 	}
 	if value < 0 {
@@ -194,6 +197,11 @@ func getBatchFile(ctx *cli.Context) string {
 		path, _ = prompt.Run()
 	}
 	return path
+}
+
+// getMacroParser returns a macro definition parser.
+func getMacroParser(client *client.Client, path string) (*MacroParser, error) {
+	return NewMacroParser(client, path)
 }
 
 // getSheetId returns excel sheet id from command line input.

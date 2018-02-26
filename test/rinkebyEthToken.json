@@ -1,5 +1,11 @@
 [
   {
+    "address": "0x106b64659a1ee0c6983a68d28b2cbc26d8628b06",
+    "symbol": "AEDU",
+    "decimal": 18,
+    "type": "default"
+  },
+  {
     "address": "0xe10f51424adbead82eb4b9ae72c29828dc24188f",
     "symbol": "RDN",
     "decimal": 18,

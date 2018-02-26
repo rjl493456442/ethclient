@@ -46,7 +46,7 @@ func Call(ctx *cli.Context) error {
 		data     = ctx.String(dataFlag.Name)
 	)
 	// Construct call message
-	if !CheckArguments(sender, receiver, value, data) {
+	if !CheckArguments(sender, receiver, value, common.FromHex(data)) {
 		return errInvalidArguments
 	}
 	to := common.HexToAddress(receiver)
