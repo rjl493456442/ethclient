@@ -159,3 +159,16 @@ A excel format `batch file` looks like:
 
 ![](./images/excel_format.jpeg)
 
+#### Macro definition
+
+Ethclient also supports macro definition in batch file. For example, if you want to transfer 200 EOS token to the given receiver, you can add the `#TRANSFER EOS 200` macro definition to the `data` field in batch file.
+
+Now only 2 macro definitions are support:
+
+| Macro Definition | Semantic                                 | Argument number | Example                       |
+| ---------------- | ---------------------------------------- | --------------- | ----------------------------- |
+| Transfer         | ```#TRANSFER <token symbol> <token number> Or <token percentage>``` | 2               | ```#TRANSFER EOS 20%```       |
+| BalanceOf        | ```#BALANCEOF <token symbol> <holder address>``` | 2               | ```#BALANCEOF EOS 0x123456``` |
+
+> Note, all available tokens are listed in [this json file](https://raw.githubusercontent.com/kvhnuke/etherwallet/mercury/app/scripts/tokens/ethTokens.jso). If you want use your customized token, you can add the token to a customized file adhere the standard format and  specify the `tokenFile` by `--tokenfile` flag.
+
