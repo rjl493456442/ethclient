@@ -163,7 +163,7 @@ func SendBatch(ctx *cli.Context) error {
 		if !CheckArguments(entry.From.Hex(), entry.To.Hex(), int(entry.Value), []byte(entry.Data)) {
 			return errInvalidArguments
 		}
-		var data string	= entry.Data
+		var data string = entry.Data
 		var to common.Address = entry.To
 		if mp.isMacroDefinition(data) {
 			to, data, _, err = mp.Parse(data, entry.From.Hex(), entry.To.Hex())

@@ -90,4 +90,3 @@ func ExampleExcelReaderReadAll() {
 	// 0x7Cd6342b4b02A90bcf60F1f843d1002897e38b1f
 	// 0xfFc1736f670f305A3d752280d07F6895379cbD70
 }
-

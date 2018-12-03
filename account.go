@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -94,8 +95,7 @@ func generateAccount(ctx *cli.Context) error {
 			continue
 		}
 
-		keyfilepath := keystore.KeyFileName(key.Address)
-		keyfilepath = path.Join(prefix, keyfilepath)
+		keyfilepath := path.Join(prefix, strings.ToLower(key.Address.Hex()))
 		// Store the file to disk.
 		if err := os.MkdirAll(filepath.Dir(keyfilepath), 0700); err != nil {
 			logger.Errorf("Could not create directory %s\n", filepath.Dir(keyfilepath))
@@ -108,7 +108,7 @@ func generateAccount(ctx *cli.Context) error {
 
 		// Output some information.
 		logger.Notice("Address:", key.Address.Hex())
-		accountList.WriteString(key.Address.Hex() + "\n")
+		accountList.WriteString(strings.ToLower(key.Address.Hex()) + "\n")
 	}
 	return nil
 }

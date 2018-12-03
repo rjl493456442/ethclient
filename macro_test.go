@@ -45,8 +45,8 @@ func TestReadTokenList(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	var (
-		cmdBalanceOf = "#BALANCEOF RDN 0x8f0909ccb296ebd319834edb0d5785794b781d7f"
-		cmdTransfer  = "#TRANSFER RDN 100"
+		cmdBalanceOf          = "#BALANCEOF RDN 0x8f0909ccb296ebd319834edb0d5785794b781d7f"
+		cmdTransfer           = "#TRANSFER RDN 100"
 		cmdPercentageTransfer = "#TRANSFER RDN 50%"
 	)
 	cli, err := client.NewClient("http://172.16.5.3:9999")
